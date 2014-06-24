@@ -1,0 +1,232 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title></title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_mdnsresponder@jackson.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+
+<ul id="index">
+  <li><a href="#NAME">NAME</a></li>
+  <li><a href="#VERSION">VERSION</a></li>
+  <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+  <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+  <li><a href="#METHODS">METHODS</a>
+    <ul>
+      <li><a href="#CONSTRUCTOR-new-">CONSTRUCTOR (new)</a></li>
+      <li><a href="#add">add</a></li>
+      <li><a href="#get_object">get_object</a></li>
+      <li><a href="#remove">remove</a></li>
+      <li><a href="#clear">clear</a></li>
+      <li><a href="#count">count</a></li>
+      <li><a href="#replace_object">replace_object</a></li>
+    </ul>
+  </li>
+  <li><a href="#ACKNOWLEDGEMENTS">ACKNOWLEDGEMENTS</a></li>
+  <li><a href="#LICENSE">LICENSE</a></li>
+  <li><a href="#AUTHOR">AUTHOR</a></li>
+</ul>
+
+<h1 id="NAME">NAME</h1>
+
+<p>Statistics::WeightedSelection - Select a random object according to its weight.</p>
+
+<h1 id="VERSION">VERSION</h1>
+
+<p>version 0.01</p>
+
+<h1 id="SYNOPSIS">SYNOPSIS</h1>
+
+<pre><code>    use Statistics::WeightedSelection;
+
+    my $w = Statistics::WeightedSelection-&gt;new();
+
+    # add some objects
+    $w-&gt;add(
+        object =&gt; &#39;string&#39;,
+        weight =&gt; 4,
+    );
+    $w-&gt;add(
+        object =&gt; {p =&gt; 1, q =&gt; 2},
+        weight =&gt; 1,
+    );
+    $w-&gt;add(
+        object =&gt; $any_scalar,
+        weight =&gt; 7.5,
+    );
+
+    # get a random one based upon the individual weight relative to the
+    #   combined weight and remove it from the pool for future selection
+    #
+    #   4 / 12.5 * 100 percent of the time, you&#39;ll get &#39;string&#39;
+    #   1 / 12.5 * 100 percent of the time, you&#39;ll get {p =&gt; 1, q =&gt; 2}
+    # 7.5 / 12.5 * 100 percent of the time, you&#39;ll get $any_scalar
+    my $object = $w-&gt;get_object();
+
+    # because the last one was removed, the remaining objects are the new
+    #   pool for calculating weights and probabilities
+    my $another_object = $w-&gt;get_object();
+
+    # get the number of objects remaining
+    my $remaining_object_count = $w-&gt;count();
+
+    # when constructed using with_replacement and a true value, probababilities
+    #   of being selected will remain constant, as after an item is selected,
+    #   it is not removed from the pool.
+    my $wr = Statistics::WeightedSelection-&gt;new(with_replacement =&gt; 1);
+    #...
+    #...
+    my $replaced_object = $wr-&gt;get_object();</code></pre>
+
+<h1 id="DESCRIPTION">DESCRIPTION</h1>
+
+<p>A WeightedSelection object is intended to hold unordered objects that each have a corresponding weight. The objects can be any perl scalar or object, and the weights can be any positive integer or floating number.</p>
+
+<p>At any time, an object can be retrived from the pool. The probability of any object being selected corresponds to its weight divided by the combined weight of all the objects currently in the container.</p>
+
+<p>Objects that are no longer desired to be in the pool can be removed, and an id can be assigned to any of the items to ease in this later removal.</p>
+
+<h1 id="METHODS">METHODS</h1>
+
+<h2 id="CONSTRUCTOR-new-">CONSTRUCTOR (new)</h2>
+
+<p>To create a new cache object, call <code>&lt;Statistics::WeightedSelection-&gt;new</code>. It takes the optional arguments listed below.</p>
+
+<dl>
+
+<dt id="with_replacement-optional-">with_replacement (optional)</dt>
+<dd>
+
+<p>This single configuration, when true, will not remove the object selected from the pool after a call to get_object();</p>
+
+<pre><code>    # replace the object selected with the same object, i.e. don&#39;t remove it.
+    my $w = Statistics::WeightedSelection-&gt;new(with_replacement =&gt; 1);</code></pre>
+
+</dd>
+</dl>
+
+<h2 id="add">add</h2>
+
+<p>This method is used to add an object and weight to the objects for possible future selection. 2 required and 1 optional arg are described below.</p>
+
+<dl>
+
+<dt id="object-required-">object (required)</dt>
+<dd>
+
+<p>The object. Any scalar will do: string, arrayref, hashref, blessed scalar or otherwise.</p>
+
+</dd>
+<dt id="weight-required-">weight (required)</dt>
+<dd>
+
+<p>The weight. Integer or float/decimal. Must be greater than 0. This arbitrary number when divided by the total combined weights of the object is the probability that it will be selected on the next call to get_object();</p>
+
+</dd>
+<dt id="id-optional-">id (optional)</dt>
+<dd>
+
+<p>This is an id that can be used to remove() items later, if desired. It is not required, and the value, if not passed, will default to a serialized version of the object passed (see above).</p>
+
+</dd>
+</dl>
+
+<h2 id="get_object">get_object</h2>
+
+<p>Selects an object from the bucket / pool / container randomly, with probabilities of being picked for each item equal to its weight divided by the combined weights.</p>
+
+<p>By default, the object is removed without replacement. If with_replacement was passed to the constructor, or if in a subclass, a call to replace_object() returns true, then the object is not deleted, and is effectively replaced (or put back) into the pool for future selection.</p>
+
+<p>Takes no arguments.</p>
+
+<h2 id="remove">remove</h2>
+
+<p>Items that were previously added using add() can be removed from future selection. Either objects that are equivalent (not necessarily a ref to the same object in the container, but one that after serialization is equivalent), or ones that match an id (which was an optional arg for add()) will all be removed.</p>
+
+<h2 id="clear">clear</h2>
+
+<p>Removes all items from the selection pool. A call to get_object() immediately afterward will return nothing.</p>
+
+<h2 id="count">count</h2>
+
+<p>The current count of objects that are in the selection pool. It should be noted that sometimes, the same scalar might have been added multiple times with calls to add(), and that those separate instances are all counted separately.</p>
+
+<h2 id="replace_object">replace_object</h2>
+
+<p>Returns whether or not a future call to get_object will replace the object (i.e. not remove it). If true, the object will not be removed. If false, the object will be removed.</p>
+
+<p>The default behavior, if nothing was passed to the constructor, is to have this return false.</p>
+
+<p>In a subclass, this method could be overwritten for behavior that doesn&#39;t always or never replace the object after a call to get_object().</p>
+
+<h1 id="ACKNOWLEDGEMENTS">ACKNOWLEDGEMENTS</h1>
+
+<p>The ideas encapsulated in this module were created while I was working at Rent.com, a RentPath company. Rent.com has supported me the whole way in releasing this module, and they have fostered an openness in not only utilizing open community tools, but contributing to them, as well.</p>
+
+<p>I&#39;d also like to thank a few individuals for their contributions:</p>
+
+<dl>
+
+<dt id="YAPC-2014-in-Orlando-Florida">YAPC 2014 in Orlando, Florida</dt>
+<dd>
+
+<p>The conference that finally pushed me to finish this module and make it available.</p>
+
+</dd>
+<dt id="Ripta-Pasay">Ripta Pasay</dt>
+<dd>
+
+<p>My manager (and brilliant developer) at Rent, who helped ask the appropriate management at our company about releasing this module without specific, formal policies.</p>
+
+</dd>
+<dt id="Aran-Daltec">Aran Daltec</dt>
+<dd>
+
+<p>Former Rent.com employee who helped by allowing me to bounce ideas for names and interface of this module, and also to help me search for modules that might have already been written to accomplish a similar purpose.</p>
+
+</dd>
+<dt id="Steve-Nolte">Steve Nolte</dt>
+<dd>
+
+<p>Head hauncho of Milwaukee PM who helped steer me in the direction of how to package and manage this module for release.</p>
+
+</dd>
+<dt id="Steven-Lembark">Steven Lembark</dt>
+<dd>
+
+<p>For discussing namespaces and name ideas with a total stranger. He really is a testament to how helpful people in the Perl community can be.</p>
+
+</dd>
+<dt id="Sawyer-X">Sawyer X</dt>
+<dd>
+
+<p>More discussion of namespaces, and helping to guide me in to whom to talk about such things for further ideas.</p>
+
+</dd>
+<dt id="Adam-Dutko">Adam Dutko</dt>
+<dd>
+
+<p>For giving a talk at YAPC to discuss issues about making a module and getting it ready for release on CPAN.</p>
+
+</dd>
+</dl>
+
+<h1 id="LICENSE">LICENSE</h1>
+
+<p>This is free software; you can redistribute it and/or modify it under the same terms as the Perl 5 programming language system itself.</p>
+
+<h1 id="AUTHOR">AUTHOR</h1>
+
+<p>Alan Voss &lt;alanvoss@hotmail.com&gt;</p>
+
+
+</body>
+
+</html>
+
+
