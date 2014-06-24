@@ -1,6 +1,8 @@
 package Statistics::WeightedSelection;
 
-use Modern::Perl;
+use strict;
+use warnings;
+
 use Storable qw/freeze/;
 
 our $VERSION = 0.01;
@@ -294,32 +296,147 @@ weight of all the objects currently in the container.
 Objects that are no longer desired to be in the pool can be removed, and
 an id can be assigned to any of the items to ease in this later removal.
 
-
-
-
-
 =head1 METHODS
 
-=head2 add(object, weight)
 
-Adds an object (any perl scalar will do) with an associated numeric weight.
-Decimal values are allowed.
+=head2 CONSTRUCTOR (new)
 
-=head2 get_random
+To create a new cache object, call C<<Statistics::WeightedSelection-E<gt>new>.
+It takes the optional arguments listed below.
 
-Get a random weighted item and remove it from the future selection pool for the
-next get_random() call.
+=over
 
-=head1 EXAMPLES
+=item with_replacement (optional)
 
-=head1 FILES
+This single configuration, when true, will not remove the object selected
+from the pool after a call to get_object();
 
-=head1 SEE ALSO
+    # replace the object selected with the same object, i.e. don't remove it.
+    my $w = Statistics::WeightedSelection->new(with_replacement => 1);
 
-=head1 CAVEATS
+=back
+
+=head2 add
+
+This method is used to add an object and weight to the objects for possible
+future selection.  2 required and 1 optional arg are described below.
+
+=over
+
+=item object (required)
+
+The object.  Any scalar will do: string, arrayref, hashref, blessed scalar
+or otherwise.
+
+=item weight (required)
+
+The weight.  Integer or float/decimal.  Must be greater than 0.  This arbitrary
+number when divided by the total combined weights of the object is the probability
+that it will be selected on the next call to get_object();
+
+=item id (optional)
+
+This is an id that can be used to remove() items later, if desired.  It is not
+required, and the value, if not passed, will default to a serialized version
+of the object passed (see above).
+
+=back
+
+=head2 get_object
+
+Selects an object from the bucket / pool / container randomly, with probabilities
+of being picked for each item equal to its weight divided by the combined weights.
+
+By default, the object is removed without replacement.  If with_replacement was
+passed to the constructor, or if in a subclass, a call to replace_object() returns
+true, then the object is not deleted, and is effectively replaced (or put back) into
+the pool for future selection.
+
+Takes no arguments.
+
+=head2 remove
+
+Items that were previously added using add() can be removed from future selection.
+Either objects that are equivalent (not necessarily a ref to the same object in the
+container, but one that after serialization is equivalent), or ones that match an id
+(which was an optional arg for add()) will all be removed.
+
+=head2 clear
+
+Removes all items from the selection pool.  A call to get_object() immediately afterward
+will return nothing.
+
+=head2 count
+
+The current count of objects that are in the selection pool.  It should be noted that
+sometimes, the same scalar might have been added multiple times with calls to add(), and
+that those separate instances are all counted separately.
+
+=head2 replace_object
+
+Returns whether or not a future call to get_object will replace the object (i.e. not remove
+it).  If true, the object will not be removed.  If false, the object will be removed.
+
+The default behavior, if nothing was passed to the constructor, is to have this return false.
+
+In a subclass, this method could be overwritten for behavior that doesn't always or never
+replace the object after a call to get_object().
+
+=head1 ACKNOWLEDGEMENTS
+
+The ideas encapsulated in this module were created while I was working at Rent.com, a
+RentPath company.  Rent.com has supported me the whole way in releasing this module, and
+they have fostered an openness in not only utilizing open community tools, but contributing
+to them, as well.
+
+I'd also like to thank a few individuals for their contributions:
+
+=over
+
+=item YAPC 2014 in Orlando, Florida
+
+The conference that finally pushed me to finish this module and make it available.
+
+=item Ripta Pasay
+
+My manager (and brilliant developer) at Rent, who helped ask the appropriate management
+at our company about releasing this module without specific, formal policies.
+
+=item Aran Daltec
+
+Former Rent.com employee who helped by allowing me to bounce ideas for names and interface
+of this module, and also to help me search for modules that might have already been written
+to accomplish a similar purpose.
+
+=item Steve Nolte
+
+Head hauncho of Milwaukee PM who helped steer me in the direction of how to package and
+manage this module for release.
+
+=item Steven Lembark
+
+For discussing namespaces and name ideas with a total stranger.  He really is a testament
+to how helpful people in the Perl community can be.
+
+=item Sawyer X
+
+More discussion of namespaces, and helping to guide me in to whom to talk about such things
+for further ideas.
+
+=item Adam Dutko
+
+For giving a talk at YAPC to discuss issues about making a module and getting it ready for
+release on CPAN.
+
+=back
+
+=head1 LICENSE
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =head1 AUTHOR
 
-Alan Voss <avoss@rent.com>
+Alan Voss <alanvoss@hotmail.com>
 
 =cut
