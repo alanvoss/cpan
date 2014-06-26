@@ -2,6 +2,7 @@ package Statistics::WeightedSelection;
 
 use strict;
 use warnings;
+use Carp qw/croak cluck/;
 
 use Storable qw/freeze/;
 
@@ -30,12 +31,12 @@ sub add {
     my $id = $args{id} // (ref $object ? freeze($object) : $object);
 
     unless ($weight && $object) {
-        die 'Calls to ' . __PACKAGE__ . "::add() must include an arg named 'object'"
+        croak 'Calls to ' . __PACKAGE__ . "::add() must include an arg named 'object'"
             . " and a non-zero weight\n";
     }
 
     unless ($weight =~ /^\d+(\.\d*)?/) {
-        die 'Calls to ' . __PACKAGE__ . "::add()'s must include an arg named 'weight'"
+        croak 'Calls to ' . __PACKAGE__ . "::add()'s must include an arg named 'weight'"
             . " that must be a whole integer or number with decimal\n";
     }
 
@@ -87,7 +88,7 @@ sub remove {
     my ($self, $id) = @_;
 
     unless (defined $id) {
-        die 'Calls to ' . __PACKAGE__ . "::remove() must include an id to remove\n";
+        croak 'Calls to ' . __PACKAGE__ . "::remove() must include an id to remove\n";
     }
 
     $id = ref $id ? freeze($id) : $id;
@@ -95,7 +96,7 @@ sub remove {
     my $indexes = delete $self->{id_lookup}->{$id};
 
     unless ($indexes && %{$indexes}) {
-        warn "Key $id contains no associated indexes currently\n";
+        cluck "Key $id contains no associated indexes currently\n";
         return;
     }
 
@@ -111,7 +112,7 @@ sub remove {
     return map {$_->{object}} @removed;
 }
 
-sub get_object {
+sub get {
     my ($self, $override_replacement) = @_;
     return unless @{ $self->{objects} };
 
@@ -165,6 +166,20 @@ sub get_object {
 sub replace_object {
     my ($self) = @_;
     return $self->{with_replacement};
+}
+
+sub with_replacement {
+    my ($self, $new_setting) = @_;
+    croak 'Calls to ' . __PACKAGE__ . '::with_replacement() must include a defined '
+        . "truthy or falsey value\n" unless defined $new_setting;
+    $self->{with_replacement} = $new_setting;
+    return;
+}
+
+sub dump {
+    my ($self) = @_;
+    return [map { {object => $_->{object}, weight => $_->{weight}, id => $_->{id}} }
+        @{$self->{objects}}];
 }
 
 sub clear {
@@ -234,7 +249,7 @@ __END__
 
 =head1 NAME
 
-Statistics::WeightedSelection - Select a random object according to its weight.
+C<Statistics::WeightedSelection> - Select a random object according to its weight.
 
 =head1 VERSION
 
@@ -266,11 +281,11 @@ version 0.01
     #   4 / 12.5 * 100 percent of the time, you'll get 'string'
     #   1 / 12.5 * 100 percent of the time, you'll get {p => 1, q => 2}
     # 7.5 / 12.5 * 100 percent of the time, you'll get $any_scalar
-    my $object = $w->get_object();
+    my $object = $w->get();
 
     # because the last one was removed, the remaining objects are the new
     #   pool for calculating weights and probabilities
-    my $another_object = $w->get_object();
+    my $another_object = $w->get();
 
     # get the number of objects remaining
     my $remaining_object_count = $w->count();
@@ -281,106 +296,160 @@ version 0.01
     my $wr = Statistics::WeightedSelection->new(with_replacement => 1);
     #...
     #...
-    my $replaced_object = $wr->get_object();
+    my $replaced_object = $wr->get();
 
 =head1 DESCRIPTION
 
-A WeightedSelection object is intended to hold unordered objects that each
-have a corresponding weight.  The objects can be any perl scalar or object,
-and the weights can be any positive integer or floating number.
+A C<Statistics::WeightedSelection> object is intended to hold unordered objects
+(at least logically from the caller's perspective) that each have a corresponding
+weight.  The objects can be any perl scalar or object, and the weights can be any
+positive integer or floating number.
 
-At any time, an object can be retrived from the pool.  The probability of
+At any time, an object can be retrieved from the pool.  The probability of
 any object being selected corresponds to its weight divided by the combined
 weight of all the objects currently in the container.
 
 Objects that are no longer desired to be in the pool can be removed, and
 an id can be assigned to any of the items to ease in this later removal.
 
+=head1 CAVEATS
+
+An intentional design decision was to use a simple blessed hash to represent
+the internals of the object, with no direct accessors, which should not
+be necessary for users of the object.  The C<dump()> method is there as a way
+to see them, but individual items should not be directly manipulated, and if
+they are, there's no guarantee of your success.
+
+Adding and manual deletion should be done through the appropriate methods,
+C<add()> and C<remove()>, respectively.
+
+I partially did this for speed reasons, and partially to protect people from
+accidental mishaps.  Perhaps I could be persuaded to do so with a sufficiently
+reasonable argument.
+
 =head1 METHODS
 
+=head2 CONSTRUCTOR - new()
 
-=head2 CONSTRUCTOR (new)
-
-To create a new cache object, call C<<Statistics::WeightedSelection-E<gt>new>.
+To create a new cache object, call C<Statistics::WeightedSelection-E<gt>new>.
 It takes the optional arguments listed below.
 
 =over
 
-=item with_replacement (optional)
+=item C<with_replacement> (optional)
 
 This single configuration, when true, will not remove the object selected
-from the pool after a call to get_object();
+from the pool after a call to C<get()>;
 
     # replace the object selected with the same object, i.e. don't remove it.
     my $w = Statistics::WeightedSelection->new(with_replacement => 1);
 
 =back
 
-=head2 add
+=head2 add()
 
 This method is used to add an object and weight to the objects for possible
-future selection.  2 required and 1 optional arg are described below.
+future selection.  Two required and one optional arg are described below.
 
 =over
 
-=item object (required)
+=item C<object> (required)
 
 The object.  Any scalar will do: string, arrayref, hashref, blessed scalar
 or otherwise.
 
-=item weight (required)
+=item C<weight> (required)
 
 The weight.  Integer or float/decimal.  Must be greater than 0.  This arbitrary
 number when divided by the total combined weights of the object is the probability
-that it will be selected on the next call to get_object();
+that it will be selected on the next call to C<get()>.
 
-=item id (optional)
+=item C<id> (optional)
 
-This is an id that can be used to remove() items later, if desired.  It is not
+This is an id that can be used to C<remove()> items later, if desired.  It is not
 required, and the value, if not passed, will default to a serialized version
 of the object passed (see above).
 
 =back
 
-=head2 get_object
+=head2 get()
 
 Selects an object from the bucket / pool / container randomly, with probabilities
 of being picked for each item equal to its weight divided by the combined weights.
 
-By default, the object is removed without replacement.  If with_replacement was
-passed to the constructor, or if in a subclass, a call to replace_object() returns
-true, then the object is not deleted, and is effectively replaced (or put back) into
-the pool for future selection.
+By default, the object is removed without replacement.  A special method exists,
+C<replace_object>, that will determine if the object will be removed or replaced.
+
+If any of the following happened, the object will be replaced, i.e.  not removed.
+
+=over
+
+=item C<with_replacement> was passed to the constructor with a truthy value
+
+This condition is only true if the C<with_replacement()> method was not subsequently
+called to set to a possible different value.
+
+=item C<replace_object> has been overridden by a subclass of this module
+
+and the override returns true.
+
+=item The most recent call to C<with_replacement()> included a truthy value.
+
+=back
 
 Takes no arguments.
 
-=head2 remove
+=head2 dump()
 
-Items that were previously added using add() can be removed from future selection.
+Returns an arrayref of hashrefs, which represents most of the internals of the
+selection pool.  Each hashref in the arrayref will look something like this:
+
+    # {object => 'myscalar', weight => 1, id => 'myscalar'}
+
+Of all the methods, this is the most likely to change in the future, but I will
+attempt to keep it similar.
+
+It should be noted that there is no consolidation of like objects.  They will
+be returned exactly as they were added, even if in duplicate.
+
+=head2 remove()
+
+Items that were previously added using C<add()> can be removed from future selection.
 Either objects that are equivalent (not necessarily a ref to the same object in the
 container, but one that after serialization is equivalent), or ones that match an id
-(which was an optional arg for add()) will all be removed.
+(which was an optional arg for C<add()>) will all be removed.
 
-=head2 clear
+=head2 clear()
 
-Removes all items from the selection pool.  A call to get_object() immediately afterward
+Removes all items from the selection pool.  A call to C<get()> immediately afterward
 will return nothing.
 
-=head2 count
+=head2 count()
 
 The current count of objects that are in the selection pool.  It should be noted that
-sometimes, the same scalar might have been added multiple times with calls to add(), and
+sometimes, the same scalar might have been added multiple times with calls to C<add()>, and
 that those separate instances are all counted separately.
 
-=head2 replace_object
+=head2 replace_object()
 
-Returns whether or not a future call to get_object will replace the object (i.e. not remove
+Returns whether or not a future call to C<get()> will replace the object (i.e. not remove
 it).  If true, the object will not be removed.  If false, the object will be removed.
 
 The default behavior, if nothing was passed to the constructor, is to have this return false.
 
 In a subclass, this method could be overwritten for behavior that doesn't always or never
-replace the object after a call to get_object().
+replace the object after a call to C<get()>.  An alternative is to set the value for
+subsequent selections using C<with_replacement()>.
+
+=head2 with_replacement()
+
+Takes one argument, which must be defined (I didn't think it to be good form to default
+a call with zero args to C<with_replacement()> to be falsey, as it might almost appear
+to be desired at first read).  This sets whether or not an object will be removed from
+the pool after selection.  If this is true, it will remain after a call to C<get()>, and
+if false, it will not.  This overrides the setting, if any, that was passed to the
+constructor, and will affect future calls to C<replace_object()>, assuming the object is
+not a subclass that overrides that method.
 
 =head1 ACKNOWLEDGEMENTS
 
@@ -389,7 +458,7 @@ RentPath company.  Rent.com has supported me the whole way in releasing this mod
 they have fostered an openness in not only utilizing open community tools, but contributing
 to them, as well.
 
-I'd also like to thank a few individuals for their contributions:
+I'd also like to thank an organization and a few individuals for their contributions:
 
 =over
 
@@ -400,9 +469,11 @@ The conference that finally pushed me to finish this module and make it availabl
 =item Ripta Pasay
 
 My manager (and brilliant developer) at Rent, who helped ask the appropriate management
-at our company about releasing this module without specific, formal policies.
+at our company about releasing this module without specific, formal policies.  He also
+helped me vet the algorithm and test for problems in randomness on initial and subsequent
+selections.
 
-=item Aran Daltec
+=item Aran Deltac
 
 Former Rent.com employee who helped by allowing me to bounce ideas for names and interface
 of this module, and also to help me search for modules that might have already been written

@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 812;
+use Test::More tests => 822;
 use Storable qw(dclone);
 
 BEGIN {
@@ -17,10 +17,79 @@ my $check_distribution_count = 10000;
 my $w = Statistics::WeightedSelection->new();
 can_ok($w, 'add');
 can_ok($w, 'remove');
-can_ok($w, 'get_object');
+can_ok($w, 'get');
+can_ok($w, 'with_replacement');
+can_ok($w, 'dump');
 can_ok($w, 'clear');
 can_ok($w, 'count');
 can_ok($w, 'replace_object');
+
+diag 'check that calls to with_replacement change future behavior of get()';
+{
+    my $w_with_initial_replacement = Statistics::WeightedSelection->new(
+        with_replacement => 1
+    );
+
+    $w_with_initial_replacement->add(object => create_string(), weight => 1);
+    $w_with_initial_replacement->add(object => create_string(), weight => 2);
+    $w_with_initial_replacement->add(object => create_string(), weight => 3);
+    is($w_with_initial_replacement->count(), 3, 'count is now 3');
+    $w_with_initial_replacement->get();
+    is($w_with_initial_replacement->count(), 3, 'count is now 3');
+
+    eval {
+        $w_with_initial_replacement->with_replacement();
+    };
+    ok($@, 'need an arg for with_replacement()');
+
+    $w_with_initial_replacement->with_replacement(0);
+    $w_with_initial_replacement->get();
+    is($w_with_initial_replacement->count(), 2, 'count is now 2');
+}
+
+diag 'check that dump spits out an arrayref of objects';
+{
+    $w->clear();
+    my @string_objects = (create_string(), create_string()); 
+    $w->add(object => $string_objects[0], weight => 1);
+    $w->add(object => $string_objects[1], weight => 2);
+    my $internals = $w->dump();
+    is_deeply($internals, [
+        {
+           'object' => $string_objects[0],
+           'weight' => 1,
+           'id'     => $string_objects[0],
+        },
+        {
+           'object' => $string_objects[1], 
+           'weight' => 2, 
+           'id'     => $string_objects[1], 
+        },
+    ], 'internals match what is expected');
+}
+
+diag 'check that add croaks without weight and object args';
+{
+    $w->clear();
+    eval {
+        $w->add(object => 'alan');
+    };
+    ok($@, 'need a weight arg for add()');
+
+    eval {
+        $w->add(weight => 1);
+    };
+    ok($@, 'need an object arg for add()');
+}
+
+diag 'check that remove croaks without id arg';
+{
+    $w->clear();
+    eval {
+        $w->remove();
+    };
+    ok($@, 'need an id arg for remove()');
+}
 
 diag 'check that different kinds of objects can be stored';
 {
@@ -161,10 +230,10 @@ diag 'insert 1 item, insert another item, get 1, then get the other, checking co
     is($w->count(), 1, 'count is now 1');
     $w->add(object => create_string(), weight => 1);
     is($w->count(), 2, 'count is now 2');
-    my $object = $w->get_object();
+    my $object = $w->get();
     ok($object, 'get back an object');
     is($w->count(), 1, 'count is now 1');
-    $object = $w->get_object();
+    $object = $w->get();
     ok($object, 'get back another object');
     is($w->count(), 0, 'count is now 0');
     check_distribution($w);
@@ -180,7 +249,7 @@ diag 'insert items, check count, clear, check count, and get no item back';
     is($w->count(), 4, 'count is now 4');
     $w->clear();
     is($w->count(), 0, 'count is now 0');
-    my $object = $w->get_object();
+    my $object = $w->get();
     ok(!$object, 'did not get back an object');
     check_distribution($w);
 }
@@ -193,7 +262,7 @@ diag 'insert items, check count, remove 1 item, check count';
     $w->add(object => create_string(), weight => 1);
     $w->add(object => create_string(), weight => 1);
     is($w->count(), 4, 'count is now 4');
-    my $object = $w->get_object();
+    my $object = $w->get();
     ok($object, 'get back an object');
     is($w->count(), 3, 'count is now 3');
     check_distribution($w);
@@ -207,9 +276,9 @@ diag 'insert items, check count, remove 2 items, check count';
     $w->add(object => create_string(), weight => 1);
     $w->add(object => create_string(), weight => 1);
     is($w->count(), 4, 'count is now 4');
-    my $object = $w->get_object();
+    my $object = $w->get();
     ok($object, 'get back an object');
-    $object = $w->get_object();
+    $object = $w->get();
     ok($object, 'get back another object');
     is($w->count(), 2, 'count is now 2');
     check_distribution($w);
@@ -224,7 +293,7 @@ diag 'insert items, check count, select 1 item with replacement, check count';
     $wr->add(object => create_string(), weight => 1);
     $wr->add(object => create_string(), weight => 1);
     is($wr->count(), 4, 'count is now 4');
-    my $object = $wr->get_object();
+    my $object = $wr->get();
     ok($object, 'get back an object');
     is($wr->count(), 4, 'count is now 4');
     check_distribution($wr);
@@ -266,17 +335,17 @@ diag 'check distributions';
     sub check_distribution {
         my ($w) = @_;
         return if !$w->count();
-        return if $distribution_check_counts{join('-', map {$_->{object}} @{$w->{objects}})}++;
+        return if $distribution_check_counts{join('-', map {$_->{object}} @{$w->dump()})}++;
         my %selected_counts;
         for (1..$check_distribution_count) {
             my $w_clone = dclone $w;
-            my $random = $w_clone->get_object();
+            my $random = $w_clone->get();
             $selected_counts{$random}++;
             check_distribution($w_clone);
         }
     
         my %combined_weights;
-        $combined_weights{$_->{object}} += $_->{weight} for @{$w->{objects}};
+        $combined_weights{$_->{object}} += $_->{weight} for @{$w->dump()};
         my $total_combined_weight;
         $total_combined_weight += $_ for values %combined_weights;
     
