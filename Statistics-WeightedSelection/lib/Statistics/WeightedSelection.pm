@@ -73,12 +73,19 @@ sub add {
     # ]
 
     push @{$self->{objects}}, {
+        # if this is the first object, our starting index is zero, and otherwise, we add the
+        # new weight to the previous starting_index + weight for future binary search.
         starting_index => defined $last ? $last->{starting_index} + $last->{weight} : 0,
         weight         => $weight,
         object         => $object,
         id             => $id,
     };
 
+    # I decided to use a hash with empty values for pointers to the index for a given
+    # id or frozen object scalar, rather than using an arrayref, which might have been
+    # more intuitive.  More than one added object can have the same id, and I wanted a
+    # quick way to remove individual object pointers without having to iterate over an
+    # array somehow.
     $self->{id_lookup}->{$id}->{$#{$self->{objects}}} = undef;
 
     return $#{$self->{objects}};
@@ -93,9 +100,11 @@ sub remove {
 
     $id = ref $id ? freeze($id) : $id;
 
+    # delete the pointer altogether, as all of the objects with this id will be removed.
     my $indexes = delete $self->{id_lookup}->{$id};
 
     unless ($indexes && %{$indexes}) {
+        # no need for this to be fatal, but it might indicate a bug in caller's code
         cluck "Key $id contains no associated indexes currently\n";
         return;
     }
@@ -104,11 +113,17 @@ sub remove {
 
     my @removed;
     for my $index (@reverse_sorted_indexes) {
+        # remove all items that were pointed to that had this id
+        # doing them in reverse, so that splicing out an earlier item won't
+        # alter the indexes of items we want to splice out later.
         push @removed, splice(@{$self->{objects}}, $index, 1);
     }
 
+    # we've altered our items, and need to fix our object starting indexes
+    # and pointers for our keys.
     $self->_consolidate(reverse @reverse_sorted_indexes);
 
+    # return the removed items
     return map {$_->{object}} @removed;
 }
 
@@ -145,6 +160,9 @@ sub get {
     }
 
     my $random_element;
+
+    # don't run the removal logic in the else block if the user instructed us to replace
+    # the object
     if ($self->replace_object) {
         $random_element = $self->{objects}->[$index];
     }
@@ -152,14 +170,17 @@ sub get {
         # remove the element in question
         $random_element = splice(@{$self->{objects}}, $index, 1);
 
+        # delete out the specific pointer to this item
         delete $self->{id_lookup}->{$random_element->{id}}->{$index};
         unless (keys %{$self->{id_lookup}->{$random_element->{id}}}) {
             delete $self->{id_lookup}->{$random_element->{id}};
         }
-    
+
+        # fix starting indexes and pointers for other objects.
         $self->_consolidate($index);
     }
 
+    # return our selected object:
     return $random_element->{object};
 }
 
@@ -178,6 +199,8 @@ sub with_replacement {
 
 sub dump {
     my ($self) = @_;
+    # basically, don't return starting_index, as that is an internal implementation
+    # detail, and doesn't need to be shown to the user
     return [map { {object => $_->{object}, weight => $_->{weight}, id => $_->{id}} }
         @{$self->{objects}}];
 }
@@ -195,21 +218,50 @@ sub count {
     return $#{ $self->{objects} } + 1;
 }
 
+# internal method to fix id pointers and starting_indexes after a remove() or get() call
 sub _consolidate {
     my $self = shift;
 
-    # drop all indexes greater than the current length
+    # disregard all indexes greater than the current length of our objects property array
     my @removed_indexes = sort grep {$_ <= $#{ $self->{objects} }} @_;
 
+    # separate our list of objects into segments bookended by our removed indexes
+    # say we started with something like:
+    #    0       1       2        3      4       5       6
+    #    'alan', 'nate', 'brian', 'bob', 'nate', 'ryan', 'nate'
+    #
+    # and we called remove() on 'nate', then (1, 4, 6) would be passed to this routine, which
+    # are array indexes, NOT our starting_indexes.  6 will be removed from consideration, as
+    # it was at the end of the array.
+    #
+    # our first segment (former indexes 2 and 3) would be fixed as such:
+    #     well, we need to change the following as a result:
+    #         update 'brian''s starting index to be the starting index of 'alan' + its weight,
+    #             and subtract 1 (as we removed 1 objects before this one) from its pointer in the id lookup.
+    #         update 'bob''s starting index to be the starting index of 'brian' + its weight
+    #             and subtract 1 (as we removed 1 objects before this one) from its pointer in the id lookup.
+    #
+    # our second segment (former index 5) would be fixed as such:
+    #     well, we need to change the following as a result:
+    #         update 'ryan''s starting index to be the starting index of 'bob' + its weight
+    #             and subtract 2 (as we removed 2 objects before this one) from its pointer in the id lookup.
+
     for my $removed_index_index (0..$#removed_indexes) {
+        # find our range bookends
         my $range_start = $removed_indexes[$removed_index_index];
         my $range_end   = $removed_index_index == $#removed_indexes
             ? $#{ $self->{objects} }
             : $removed_indexes[$removed_index_index + 1] - 1;
+
+        # how many indexes were removed before our current segment, and thus the amount to subtract
+        #     from the respective pointers
         my $to_subtract = @removed_indexes - $removed_index_index;
+
         my %ids_evaluated_for_range;
         for my $object_index ($range_start..$range_end) {
             my $object = $self->{objects}->[$object_index];
+
+            # do all of the subtractions of pointer indexes at once for each segment.
             if (!$ids_evaluated_for_range{$object->{id}}++) {
                 for my $index (
                     grep {$_ >= $range_start && ($removed_index_index == $#removed_indexes || $_ <= $range_end)}
@@ -220,6 +272,7 @@ sub _consolidate {
                 }
             }
 
+            # fix the starting indexes
             $object->{starting_index} = $object_index == 0
                 ? 0
                 : do {
@@ -382,6 +435,8 @@ C<replace_object>, that will determine if the object will be removed or replaced
 
 If any of the following happened, the object will be replaced, i.e.  not removed.
 
+Returns the randomly selected object.
+
 =over
 
 =item C<with_replacement> was passed to the constructor with a truthy value
@@ -418,6 +473,8 @@ Items that were previously added using C<add()> can be removed from future selec
 Either objects that are equivalent (not necessarily a ref to the same object in the
 container, but one that after serialization is equivalent), or ones that match an id
 (which was an optional arg for C<add()>) will all be removed.
+
+Returns the removed scalars.
 
 =head2 clear()
 

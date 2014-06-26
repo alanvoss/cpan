@@ -118,6 +118,8 @@ METHODS
     If any of the following happened, the object will be replaced, i.e. not
     removed.
 
+    Returns the randomly selected object.
+
     "with_replacement" was passed to the constructor with a truthy value
         This condition is only true if the "with_replacement()" method was
         not subsequently called to set to a possible different value.
@@ -148,6 +150,8 @@ METHODS
     ref to the same object in the container, but one that after
     serialization is equivalent), or ones that match an id (which was an
     optional arg for "add()") will all be removed.
+
+    Returns the removed scalars.
 
   clear()
     Removes all items from the selection pool. A call to "get()" immediately
