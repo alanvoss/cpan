@@ -6,8 +6,6 @@ use Carp qw/croak cluck/;
 
 use Storable qw/freeze/;
 
-our $VERSION = 0.01;
-
 sub new {
     my ($class, %args) = @_;
 

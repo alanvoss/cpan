@@ -8,7 +8,7 @@ use Storable qw(dclone);
 
 BEGIN {
     my $module = 'Statistics::WeightedSelection';
-    use_ok($module, '0.01');
+    use_ok($module);
     can_ok($module, 'new');
 }
 
