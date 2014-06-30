@@ -302,10 +302,6 @@ __END__
 
 C<Statistics::WeightedSelection> - Select a random object according to its weight.
 
-=head1 VERSION
-
-version 0.01
-
 =head1 SYNOPSIS
 
     use Statistics::WeightedSelection;
