@@ -2,9 +2,6 @@ NAME
     "Statistics::WeightedSelection" - Select a random object according to
     its weight.
 
-VERSION
-    version 0.01
-
 SYNOPSIS
         use Statistics::WeightedSelection;
 
