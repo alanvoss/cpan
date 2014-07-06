@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 822;
+use Test::More tests => 820;
 use Storable qw(dclone);
 
 BEGIN {
@@ -19,7 +19,6 @@ can_ok($w, 'add');
 can_ok($w, 'remove');
 can_ok($w, 'get');
 can_ok($w, 'replace_after_get');
-can_ok($w, 'dump');
 can_ok($w, 'clear');
 can_ok($w, 'count');
 
@@ -48,27 +47,6 @@ diag 'check that calls to replace_after_get with an arg change future behavior o
 
     $w_with_initial_replacement->get();
     is($w_with_initial_replacement->count(), 2, 'count is now 2');
-}
-
-diag 'check that dump spits out an arrayref of objects';
-{
-    $w->clear();
-    my @string_objects = (create_string(), create_string()); 
-    $w->add(object => $string_objects[0], weight => 1);
-    $w->add(object => $string_objects[1], weight => 2);
-    my $internals = $w->dump();
-    is_deeply($internals, [
-        {
-           'object' => $string_objects[0],
-           'weight' => 1,
-           'id'     => $string_objects[0],
-        },
-        {
-           'object' => $string_objects[1], 
-           'weight' => 2, 
-           'id'     => $string_objects[1], 
-        },
-    ], 'internals match what is expected');
 }
 
 diag 'check that add croaks without weight and object args';
@@ -338,7 +316,7 @@ diag 'check distributions';
     sub check_distribution {
         my ($w) = @_;
         return if !$w->count();
-        return if $distribution_check_counts{join('-', map {$_->{object}} @{$w->dump()})}++;
+        return if $distribution_check_counts{join('-', map {$_->{object} . '-' . $_->{weight}} @{$w->_dump()})}++;
         my %selected_counts;
         for (1..$check_distribution_count) {
             my $w_clone = dclone $w;
@@ -348,7 +326,7 @@ diag 'check distributions';
         }
     
         my %combined_weights;
-        $combined_weights{$_->{object}} += $_->{weight} for @{$w->dump()};
+        $combined_weights{$_->{object}} += $_->{weight} for @{$w->_dump()};
         my $total_combined_weight;
         $total_combined_weight += $_ for values %combined_weights;
     

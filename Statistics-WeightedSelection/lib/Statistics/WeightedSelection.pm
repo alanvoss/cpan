@@ -188,14 +188,6 @@ sub replace_after_get {
     return $self->{replace_after_get};
 }
 
-sub dump {
-    my ($self) = @_;
-    # basically, don't return starting_index, as that is an internal implementation
-    # detail, and doesn't need to be shown to the user
-    return [map { {object => $_->{object}, weight => $_->{weight}, id => $_->{id}} }
-        @{$self->{objects}}];
-}
-
 sub clear {
     my ($self) = @_;
     $self->{objects} = [];
@@ -207,6 +199,14 @@ sub count {
     my ($self) = @_;
     return 0 if !@{ $self->{objects} };
     return $#{ $self->{objects} } + 1;
+}
+
+sub _dump {
+    my ($self) = @_;
+    # basically, don't return starting_index, as that is an internal implementation
+    # detail, and doesn't need to be shown to the user
+    return [map { {object => $_->{object}, weight => $_->{weight}, id => $_->{id}} }
+        @{$self->{objects}}];
 }
 
 # internal method to fix id pointers and starting_indexes after a remove() or get() call
@@ -355,9 +355,10 @@ an id can be assigned to any of the items to ease in this later removal.
 =head1 CAVEATS
 
 An intentional design decision was to use a simple blessed hash to represent
-the internals of the object, with few direct accessors.  The C<dump()> method
-is there as a way to see them, but individual items should not be directly
-manipulated, and if they are, there's no guarantee of your success.
+the internals of the object, with few direct accessors.  The internal C<_dump()>
+method could be used to see them (with the understanding that internals can change
+and should not be relied upon in production code), but individual items should not
+be directly manipulated, and if they are, there's no guarantee of your success.
 
 Adding and manual deletion should be done through the appropriate methods,
 C<add()> and C<remove()>, respectively.
@@ -423,19 +424,6 @@ will not be removed.
 Returns the randomly selected object.
 
 Takes no arguments.
-
-=head2 dump()
-
-Returns an arrayref of hashrefs, which represents most of the internals of the
-selection pool.  Each hashref in the arrayref will look something like this:
-
-    # {object => 'myscalar', weight => 1, id => 'myscalar'}
-
-Of all the methods, this is the most likely to change in the future, but I will
-attempt to keep it similar.
-
-It should be noted that there is no consolidation of like objects.  They will
-be returned exactly as they were added, even if in duplicate.
 
 =head2 remove()
 
