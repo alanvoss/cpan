@@ -76,11 +76,11 @@ diag 'check that different kinds of objects can be stored';
 {
     $w->clear();
     my $hash = {blue => ['turquoise', 'cyan'], yellow => ['burnt sienna']};
-    my $cgi_object = Statistics::WeightedSelection::TestObject->new();
+    my $test_object = Statistics::WeightedSelection::TestObject->new();
     $w->add(object => $hash, weight => 1);
     $w->add(object => $hash, weight => 1, id => 'my hash');
-    $w->add(object => $cgi_object, weight => 1);
-    $w->add(object => $cgi_object, weight => 1, id => 'my cgi object');
+    $w->add(object => $test_object, weight => 1);
+    $w->add(object => $test_object, weight => 1, id => 'my cgi object');
     is($w->count(), 4, 'count is now 4');
     my @removed = $w->remove('my hash');
     is(scalar @removed, 1, 'got 1 object after keyed remove');
@@ -88,15 +88,15 @@ diag 'check that different kinds of objects can be stored';
     is($w->count(), 3, 'count is now 3');
     @removed = $w->remove('my cgi object');
     is(scalar @removed, 1, 'got 1 object after keyed remove');
-    is_deeply($removed[0], $cgi_object, 'returned hash matches');
+    is_deeply($removed[0], $test_object, 'returned hash matches');
     is($w->count(), 2, 'count is now 2');
     @removed = $w->remove($hash);
     is(scalar @removed, 1, 'got 1 object after keyed remove');
     is_deeply($removed[0], $hash, 'returned hash matches');
     is($w->count(), 1, 'count is now 1');
-    @removed = $w->remove($cgi_object);
+    @removed = $w->remove($test_object);
     is(scalar @removed, 1, 'got 1 object after keyed remove');
-    is_deeply($removed[0], $cgi_object, 'returned hash matches');
+    is_deeply($removed[0], $test_object, 'returned hash matches');
     is($w->count(), 0, 'count is now 0');
 }
 
@@ -333,7 +333,7 @@ diag 'check distributions';
         for my $string (keys %combined_weights) {
             ok(defined $selected_counts{$string}, "random counts of string $string detected");
             my $selected_divided_by_weight = $selected_counts{$string} / $check_distribution_count / ($combined_weights{$string} / $total_combined_weight);
-            ok($selected_divided_by_weight > 0.85 && $selected_divided_by_weight < 1.15, "for $string, selected weight is $selected_divided_by_weight, which is sane");
+            ok($selected_divided_by_weight >= 0.75 && $selected_divided_by_weight <= 1.25, "for $string, selected weight is $selected_divided_by_weight, which is sane");
         }
     
         return;
