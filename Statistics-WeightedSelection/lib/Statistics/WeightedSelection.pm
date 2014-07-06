@@ -355,10 +355,9 @@ an id can be assigned to any of the items to ease in this later removal.
 =head1 CAVEATS
 
 An intentional design decision was to use a simple blessed hash to represent
-the internals of the object, with no direct accessors, which should not
-be necessary for users of the object.  The C<dump()> method is there as a way
-to see them, but individual items should not be directly manipulated, and if
-they are, there's no guarantee of your success.
+the internals of the object, with few direct accessors.  The C<dump()> method
+is there as a way to see them, but individual items should not be directly
+manipulated, and if they are, there's no guarantee of your success.
 
 Adding and manual deletion should be done through the appropriate methods,
 C<add()> and C<remove()>, respectively.
