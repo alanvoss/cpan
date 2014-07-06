@@ -18,16 +18,19 @@ my $w = Statistics::WeightedSelection->new();
 can_ok($w, 'add');
 can_ok($w, 'remove');
 can_ok($w, 'get');
-can_ok($w, 'with_replacement');
+can_ok($w, 'replace_after_get');
 can_ok($w, 'dump');
 can_ok($w, 'clear');
 can_ok($w, 'count');
-can_ok($w, 'replace_object');
 
-diag 'check that calls to with_replacement change future behavior of get()';
+diag 'check that calls to replace_after_get with an arg change future behavior of get()';
 {
     my $w_with_initial_replacement = Statistics::WeightedSelection->new(
-        with_replacement => 1
+        replace_after_get => 1
+    );
+    ok(
+        $w_with_initial_replacement->replace_after_get(),
+        'currently, replace_after_get() returns a truthy value'
     );
 
     $w_with_initial_replacement->add(object => create_string(), weight => 1);
@@ -37,12 +40,12 @@ diag 'check that calls to with_replacement change future behavior of get()';
     $w_with_initial_replacement->get();
     is($w_with_initial_replacement->count(), 3, 'count is now 3');
 
-    eval {
-        $w_with_initial_replacement->with_replacement();
-    };
-    ok($@, 'need an arg for with_replacement()');
+    $w_with_initial_replacement->replace_after_get(0);
+    ok(
+        !$w_with_initial_replacement->replace_after_get(),
+        'currently, replace_after_get() returns a falsey value'
+    );
 
-    $w_with_initial_replacement->with_replacement(0);
     $w_with_initial_replacement->get();
     is($w_with_initial_replacement->count(), 2, 'count is now 2');
 }
@@ -286,7 +289,7 @@ diag 'insert items, check count, remove 2 items, check count';
 
 diag 'insert items, check count, select 1 item with replacement, check count';
 {
-    my $wr = Statistics::WeightedSelection->new(with_replacement => 1);
+    my $wr = Statistics::WeightedSelection->new(replace_after_get => 1);
     $wr->clear();
     $wr->add(object => create_string(), weight => 1);
     $wr->add(object => create_string(), weight => 1);

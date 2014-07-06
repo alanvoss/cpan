@@ -10,9 +10,9 @@ sub new {
     my ($class, %args) = @_;
 
     return bless {
-        objects          => [],
-        id_lookup        => {},
-        with_replacement => $args{with_replacement} || 0,
+        objects           => [],
+        id_lookup         => {},
+        replace_after_get => $args{replace_after_get} || 0,
     }, $class;
 }
 
@@ -161,7 +161,7 @@ sub get {
 
     # don't run the removal logic in the else block if the user instructed us to replace
     # the object
-    if ($self->replace_object) {
+    if ($self->replace_after_get) {
         $random_element = $self->{objects}->[$index];
     }
     else {
@@ -182,17 +182,10 @@ sub get {
     return $random_element->{object};
 }
 
-sub replace_object {
-    my ($self) = @_;
-    return $self->{with_replacement};
-}
-
-sub with_replacement {
+sub replace_after_get {
     my ($self, $new_setting) = @_;
-    croak 'Calls to ' . __PACKAGE__ . '::with_replacement() must include a defined '
-        . "truthy or falsey value\n" unless defined $new_setting;
-    $self->{with_replacement} = $new_setting;
-    return;
+    $self->{replace_after_get} = $new_setting if defined $new_setting;
+    return $self->{replace_after_get};
 }
 
 sub dump {
@@ -337,10 +330,10 @@ C<Statistics::WeightedSelection> - Select a random object according to its weigh
     # get the number of objects remaining
     my $remaining_object_count = $w->count();
 
-    # when constructed using with_replacement and a true value, probababilities
+    # when constructed using replace_after_get and a true value, probababilities
     #   of being selected will remain constant, as after an item is selected,
     #   it is not removed from the pool.
-    my $wr = Statistics::WeightedSelection->new(with_replacement => 1);
+    my $wr = Statistics::WeightedSelection->new(replace_after_get => 1);
     #...
     #...
     my $replaced_object = $wr->get();
@@ -383,13 +376,13 @@ It takes the optional arguments listed below.
 
 =over
 
-=item C<with_replacement> (optional)
+=item C<replace_after_get> (optional)
 
 This single configuration, when true, will not remove the object selected
 from the pool after a call to C<get()>;
 
     # replace the object selected with the same object, i.e. don't remove it.
-    my $w = Statistics::WeightedSelection->new(with_replacement => 1);
+    my $w = Statistics::WeightedSelection->new(replace_after_get => 1);
 
 =back
 
@@ -424,27 +417,11 @@ of the object passed (see above).
 Selects an object from the bucket / pool / container randomly, with probabilities
 of being picked for each item equal to its weight divided by the combined weights.
 
-By default, the object is removed without replacement.  A special method exists,
-C<replace_object>, that will determine if the object will be removed or replaced.
-
-If any of the following happened, the object will be replaced, i.e.  not removed.
+By default, the object is removed without replacement.  C<replace_after_get()> will
+be called during the course of C<get()>, and if it returns a true value, the item
+will not be removed.
 
 Returns the randomly selected object.
-
-=over
-
-=item C<with_replacement> was passed to the constructor with a truthy value
-
-This condition is only true if the C<with_replacement()> method was not subsequently
-called to set to a possible different value.
-
-=item C<replace_object> has been overridden by a subclass of this module
-
-and the override returns true.
-
-=item The most recent call to C<with_replacement()> included a truthy value.
-
-=back
 
 Takes no arguments.
 
@@ -481,26 +458,21 @@ The current count of objects that are in the selection pool.  It should be noted
 sometimes, the same scalar might have been added multiple times with calls to C<add()>, and
 that those separate instances are all counted separately.
 
-=head2 replace_object()
+=head2 replace_after_get()
 
 Returns whether or not a future call to C<get()> will replace the object (i.e. not remove
 it).  If true, the object will not be removed.  If false, the object will be removed.
 
 The default behavior, if nothing was passed to the constructor, is to have this return false.
 
-In a subclass, this method could be overwritten for behavior that doesn't always or never
-replace the object after a call to C<get()>.  An alternative is to set the value for
-subsequent selections using C<with_replacement()>.
+=head2 replace_after_get(<new_value>)
 
-=head2 with_replacement()
+If C<replace_after_get()> is called with a defined value, this will override the
+value passed to the constructor (C<new()>), and subsequent calls to C<replace_after_get()> will return this new value.
 
-Takes one argument, which must be defined (I didn't think it to be good form to default
-a call with zero args to C<with_replacement()> to be falsey, as it might almost appear
-to be desired at first read).  This sets whether or not an object will be removed from
-the pool after selection.  If this is true, it will remain after a call to C<get()>, and
-if false, it will not.  This overrides the setting, if any, that was passed to the
-constructor, and will affect future calls to C<replace_object()>, assuming the object is
-not a subclass that overrides that method.
+This sets whether or not an object will be removed from the pool after selection, i.e.
+a call to C<get()>.  If this is truthy, it will remain after a call to C<get()>, and
+if false, it will not.
 
 =head1 ACKNOWLEDGEMENTS
 
