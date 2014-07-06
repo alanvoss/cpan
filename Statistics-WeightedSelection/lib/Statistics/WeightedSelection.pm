@@ -467,7 +467,8 @@ The default behavior, if nothing was passed to the constructor, is to have this 
 =head2 replace_after_get(<new_value>)
 
 If C<replace_after_get()> is called with a defined value, this will override the
-value passed to the constructor (C<new()>), and subsequent calls to C<replace_after_get()> will return this new value.
+value passed to the constructor (C<new()>), and subsequent calls to C<replace_after_get()>
+will return this new value.
 
 This sets whether or not an object will be removed from the pool after selection, i.e.
 a call to C<get()>.  If this is truthy, it will remain after a call to C<get()>, and
