@@ -26,7 +26,7 @@ sub add {
     my $object = $args{object};
 
     # an optional id, which can be used for later removal from pool
-    my $id = $args{id} // (ref $object ? freeze($object) : $object);
+    my $id = defined $args{id} ? $args{id} : (ref $object ? freeze($object) : $object);
 
     unless ($weight && $object) {
         croak 'Calls to ' . __PACKAGE__ . "::add() must include an arg named 'object'"
