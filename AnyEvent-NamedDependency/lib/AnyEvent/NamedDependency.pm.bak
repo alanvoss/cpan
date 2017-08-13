@@ -52,14 +52,6 @@ sub add {
     return;
 }
 
-sub _finished {
-    my ($self, $finished_name) = @_;
-    for my $dependency @{$self->{dependencies}->{$finished_name}}
-        $self->start($dependency);
-    }
-    return;
-}
-
 sub start {
     my ($self, $name) = @_;
 
@@ -70,18 +62,17 @@ sub start {
     }
 
     # creating a watcher
-    my $w = AnyEvent->condvar;
-    $self->{callbacks}->{$name}->{condvar} = $w;
-    $w->cb(sub {
-        $self->_finished($name);
-    });
+    $self->{callbacks}->{$name}->{condvar}  = AnyEvent->condvar;
+    $self->{callbacks}->{$name}->{condvar}->cb(sub {
 
-    # capture the return values
-    $self->{callbacks}->{$name}->{returned} = [
-        $self->{callbacks}->{$name}->{callback}->(
-            $self->{callbacks}->{ @{ $self->{watchers}->{$name} }->{returned} }
-        )
-    ];
+
+
+        # capture the return values
+        $self->{callbacks}->{$name}->{returned} = [
+            $self->{callbacks}->{$name}->{callback}->(
+                $self->{callbacks}->{ @{ $self->{watchers}->{$name} }->{returned} }
+            )
+        ];
 
 # receive args = $self->{callbacks}->{$name}->{callback}->( # pass args );
 # call send on all the watchers
@@ -143,6 +134,3 @@ $cv->end
 
 
 make sure to check ready before recv call to prevent IO blocking?
-
-
-This makes schedule the generic method to use to block the current coro and wait for events: first you remember the current coro in a variable, then arrange for some callback of yours to call ->ready on that once some event happens, and last you call schedule to put yourself to sleep. Note that a lot of things can wake your coro up, so you need to check whether the event indeed happened, e.g. by storing the status in a variable.
